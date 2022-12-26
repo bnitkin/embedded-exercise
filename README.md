@@ -1,2 +1,4 @@
-# embedded-exercise
-Little demo for a job
+# Embedded Programming Exercise
+
+This implements the stream decoder described in Brian's message.
+
