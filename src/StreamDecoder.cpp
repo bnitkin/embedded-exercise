@@ -75,7 +75,7 @@ void StreamDecoder::parseByte(uint8_t data) {
           printf("\nINFO:     checksum OK");
           // Compute common fields
           uint16_t id      = this->buffer[ProtocolMesg::DEVICE_ID_1] << 8
-                           | this->buffer[ProtocolMesg::DEVICE_ID_1];
+                           | this->buffer[ProtocolMesg::DEVICE_ID_2];
           ProtocolMesg::deviceType_e devType  =
               static_cast<ProtocolMesg::deviceType_e>(
                   this->buffer[ProtocolMesg::DEVICE_TYPE]);
@@ -123,7 +123,12 @@ void StreamDecoder::parseByte(uint8_t data) {
 
 // Check whether a particular device has an unread message.
 bool StreamDecoder::hasMessage(uint16_t deviceId) {
-   return true;
+   for (auto it : this->messages) {
+       if (it.deviceId == deviceId) {
+           return true;
+       }
+   }
+   return false;
 }
 
 // Get the next message (in sequence order) from internal storage.

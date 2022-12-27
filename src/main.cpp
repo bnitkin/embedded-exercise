@@ -1,17 +1,21 @@
 #include <stdio.h>
+#include <assert.h>
 #include "StreamDecoder.hpp"
 #include "ProtocolMesg.hpp"
 
 void test_banner(int test_num, const char* description) {
-    printf("============================================================\n");
+    printf("\n\n============================================================\n");
     printf("====                   TEST % 2d                          ====\n", test_num);
     printf("==== %-51s====\n", description);
     printf("============================================================\n");
 }
+
 void test_1() {
     // Test 1: Feed in one of each message type.
     // This first test verifies that the reader's working properly. This confirms
     // that message size calculations & checksums work; it doesn't verify any fields.
+    //
+    // Formats are pulled from section 1 of the assignment.
     //
     // Checksums were sanity-checked with a Python one-liner to strip & sum the messages
     // hex(sum([int(x.strip(','), 16) for x in '0x03, 0x04, 0x05, 0x00, 0x01, 0x00'.split()]) & 0xff)
@@ -67,7 +71,62 @@ void test_1() {
     decoder.onDataFromChip(data_8, sizeof(data_8));
 }
 
+void test_2() {
+    // Test 2: Split messages in new and exciting ways
+    // This test takes a few basic messages and feeds them into onDataFromChip
+    // in oddball ways. It demonstrates that multiple messages can be processed at once,
+    // and that messages can be split across calls.
+    // (Per parenthetical in section 2.0 of the assignment)
+    test_banner(2, "Message merging/splitting");
+
+    StreamDecoder decoder;
+    // First set - merge data_1 - data_4 from test 1 into a single push
+    uint8_t data_1[] = {0x12, 0x24, 0x0F, 0x99, 0x01, 0xDE, 0xAD, 0x0F, 0x01, 0x01, 0x04, 0x7f,
+                        0x01, 0x02, 0x1F, 0x00, 0x01, 0x01, 0x24,
+                        0x01, 0x02, 0x1F, 0x00, 0x02, 0x24,
+                        0x01, 0x02, 0x1F, 0x00, 0x03, 0x25};
+    decoder.onDataFromChip(data_1, sizeof(data_1));
+    assert (decoder.hasMessage(0x1224));
+    assert (decoder.hasMessage(0x0102));
+
+    // Second set - take data_1 above and split it into bits.
+    uint8_t data_2[] = {0x44, 0x24};
+    uint8_t data_3[] = {0x0F, 0x99};
+    uint8_t data_4[] = {0x01, 0xDE, 0xAD, 0x0F, 0x01, 0x01, 0x04, 0xB1, 0x01, 0x02, 0x1F, 0x00, 0x01, 0x01};
+    uint8_t data_5[] = {0x74};
+    uint8_t data_6[] = {0x01, 0x52, 0x1F};
+    uint8_t data_7[] = {0x00, 0x02};
+    uint8_t data_8[] = {0x24, 0x01, 0x52, 0x1F, 0x00, 0x03, 0x75};
+    decoder.onDataFromChip(data_2, sizeof(data_2));
+    decoder.onDataFromChip(data_3, sizeof(data_3));
+    decoder.onDataFromChip(data_4, sizeof(data_4));
+    decoder.onDataFromChip(data_5, sizeof(data_5));
+    decoder.onDataFromChip(data_6, sizeof(data_6));
+    decoder.onDataFromChip(data_7, sizeof(data_7));
+    decoder.onDataFromChip(data_8, sizeof(data_8));
+    assert (decoder.hasMessage(0x4424));
+    assert (decoder.hasMessage(0x0152));
+}
+
+void test_3() {
+    // Test 2: Show that messages with bad checksums are discarded
+    // (Per penultimate paragraph in section 2.0)
+    test_banner(3, "Bad checksums");
+
+    StreamDecoder decoder;
+    // Reusing data set from test 2
+    uint8_t data_1[] = {0x12, 0x24, 0x0F, 0x99, 0x01, 0xDE, 0xAD, 0x0F, 0x01, 0x01, 0x04, 0x70,
+                        0x01, 0x02, 0x1F, 0x00, 0x01, 0x01, 0x25,
+                        0x01, 0x02, 0x1F, 0x00, 0x02, 0x20,
+                        0x01, 0x02, 0x1F, 0x00, 0x03, 0x2A};
+    decoder.onDataFromChip(data_1, sizeof(data_1));
+    assert (decoder.hasMessage(0x1224) == false);
+    assert (decoder.hasMessage(0x0102) == false);
+}
+
 int main() {
-    printf(", world!\n");
+    printf("Hello, world!\n");
     test_1();
+    test_2();
+    test_3();
 }

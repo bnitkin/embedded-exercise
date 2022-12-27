@@ -22,4 +22,4 @@ src/ProtocolMesg.o:  src/ProtocolMesg.hpp  src/StreamDecoder.hpp
 src/StreamDecoder.o: src/ProtocolMesg.hpp  src/StreamDecoder.hpp
 
 bin/reader: src/main.o src/ProtocolMesg.o src/StreamDecoder.o
-	$(CC) -lstdc++ $^ -o $@
+	$(CXX) $^ -o $@
