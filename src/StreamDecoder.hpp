@@ -15,6 +15,10 @@ class StreamDecoder {
      // Clears any state in the StreamDecoder. Useful for recovery if
      // extra bytes arrive in the datastream.
      void reset();
+     // Clear the partial-message buffer, but leave the recieved-message
+     // list alone.
+     void clearBuffer();
+
 
      // Parse many bytes of incoming data. Data may be segmented,
      // but messages must arrive in the same order as on the wire.

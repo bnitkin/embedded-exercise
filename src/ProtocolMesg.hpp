@@ -44,10 +44,15 @@ class BlipMesg: public ProtocolMesg {
             HELLO = 0x01,
         } messageType_e;
 
+        typedef enum {
+            SIZE = 5,
+            STRING = 6,
+        } payloadIndex_e;
+
         std::string payload;
 
         BlipMesg(uint16_t id, deviceType_e devType,
-                 uint8_t sequence, uint8_t msgType, char* payload) :
+                 uint8_t sequence, uint8_t msgType, std::string payload) :
           ProtocolMesg(id, devType, sequence, msgType) {
             // This is a deep copy
             this->payload = payload;
