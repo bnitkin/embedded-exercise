@@ -37,7 +37,10 @@ class ProtocolMesg {
 
 // The below classes all specialize ProtocolMesg to enable protocol-agnostic fields.
 //
-// TODO: Add getters to prevent callers from changing fields without permission.
+// BJN: It wouldn't hurt to add getters to prevent callers from changing fields.
+// But since calling popNextMessage removes the message from our control,
+// there's only ever one user of the data. (As much to the point, getters are a lot
+// of boilerplate, and aren't interesting to write or read for a demo)
 class BlipMesg: public ProtocolMesg {
     public:
         typedef enum {
@@ -54,7 +57,7 @@ class BlipMesg: public ProtocolMesg {
         BlipMesg(uint16_t id, deviceType_e devType,
                  uint8_t sequence, uint8_t msgType, std::string payload) :
           ProtocolMesg(id, devType, sequence, msgType) {
-            // This is a deep copy
+            // This performs a copy construction of the string.
             this->payload = payload;
         }
 };

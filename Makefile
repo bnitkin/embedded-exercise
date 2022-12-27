@@ -23,9 +23,8 @@ clean:
 # but this way make can run some dependency trees. If this were a larger project,
 # setting up auto-dependencies would be worthwhile; this is faking that.)
 src/main.o:          src/ProtocolMesg.hpp  src/StreamDecoder.hpp
-src/ProtocolMesg.o:  src/ProtocolMesg.hpp  src/StreamDecoder.hpp
 src/StreamDecoder.o: src/ProtocolMesg.hpp  src/StreamDecoder.hpp
 
-bin/reader: src/main.o src/ProtocolMesg.o src/StreamDecoder.o
+bin/reader: src/main.o src/StreamDecoder.o
 	$(CXX) $^ -g -o $@
 
