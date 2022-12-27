@@ -95,8 +95,12 @@ class LatchMesg: public ProtocolMesg {
         typedef enum {
             STATUS = 0x01,
             OPEN   = 0x02,
-            CLOSED = 0x03,
+            CLOSE  = 0x03,
         } messageType_e;
+
+        typedef enum {
+            STATE = 5,
+        } payloadIndex_e;
 
         // Returns the message-indicated state of the latch
         bool state;

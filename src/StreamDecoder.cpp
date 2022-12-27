@@ -4,6 +4,7 @@
 // extra bytes arrive in the datastream.
 void StreamDecoder::reset() {
     // Erase both the recieved-message and processing buffers.
+    // TODO: Free all the messages.
     this->messages.clear();
     this->clearBuffer();
 }
@@ -19,119 +20,166 @@ void StreamDecoder::clearBuffer() {
 // Parse a single byte of incoming data. This performs the work
 // for onDataFromChip().
 void StreamDecoder::parseByte(uint8_t data) {
-   // Add new data to the buffer
-   this->buffer.push_back(data);
+    // Add new data to the buffer
+    this->buffer.push_back(data);
 
-   if (recievedBytes() == ProtocolMesg::MSG_TYPE+1) {
-      // Compute the payload size and add to expected size
-      // (Need to add one to compensate for zero-based indexing)
-      switch (this->buffer[ProtocolMesg::DEVICE_TYPE]) {
-         case ProtocolMesg::BLIP:
-            // Payload size is unknown, but at least 1B.
-            expectedBytes += 1;
-            break;
-         case ProtocolMesg::WIDGET:
-            // Payload is always 6B.
-            expectedBytes += 6;
-            break;
-         case ProtocolMesg::LATCH:
-            // LATCH has a 1B payload with STATUS; 0 otherwise.
-            if (this->buffer[ProtocolMesg::MSG_TYPE] == LatchMesg::STATUS) {
-               expectedBytes += 1;
+    if (recievedBytes() == ProtocolMesg::MSG_TYPE+1) {
+        // Compute the payload size and add to expected size
+        // (Need to add one to compensate for zero-based indexing)
+        switch (this->buffer[ProtocolMesg::DEVICE_TYPE]) {
+            case ProtocolMesg::BLIP:
+                // Payload size is unknown, but at least 1B.
+                expectedBytes += 1;
+                break;
+            case ProtocolMesg::WIDGET:
+                // Payload is always 6B.
+                expectedBytes += 6;
+                break;
+            case ProtocolMesg::LATCH:
+                // LATCH has a 1B payload with STATUS; 0 otherwise.
+                if (this->buffer[ProtocolMesg::MSG_TYPE] == LatchMesg::STATUS) {
+                    expectedBytes += 1;
+                }
+                break;
+            default:
+                // BJN: This protocol doesn't allow for graceful recovery since it's
+                // impossible to find breaks between messages. If there's a message
+                // we can't ID, we can't find the payload size. Without that we can't
+                // find the next message.
+                // (In reality, you'd probably wait for a quiet time on the line and
+                // reset all the buffers. In unit-test land, that sort of heuristic
+                // doesn't make much sense.)
+                printf("FATAL: Unknown device ID\n");
+                return;
+        }
+    }
+
+    if (this->buffer[ProtocolMesg::DEVICE_TYPE] == ProtocolMesg::BLIP
+        && recievedBytes() == BlipMesg::SIZE+1) {
+        // Special case for BLIP message - grab the string size from
+        // the first byte of payload.
+        expectedBytes += this->buffer[BlipMesg::SIZE];
+    }
+
+    if (recievedBytes() == this->expectedBytes) {
+        // Verify checksum and close out
+        uint8_t sum = 0;
+        uint8_t checksum = this->buffer.back();
+        this->buffer.pop_back();
+        printf("INFO: Processing");
+        for (auto it : this->buffer) {
+            printf(" %02x", it);
+            sum += it;
+        }
+
+        if (sum == checksum) {
+            printf("\nINFO:     checksum OK");
+            // Compute common fields
+            uint16_t id      = this->buffer[ProtocolMesg::DEVICE_ID_1] << 8
+                | this->buffer[ProtocolMesg::DEVICE_ID_2];
+            ProtocolMesg::deviceType_e devType  =
+                static_cast<ProtocolMesg::deviceType_e>(
+                                                        this->buffer[ProtocolMesg::DEVICE_TYPE]);
+            uint8_t sequence = this->buffer[ProtocolMesg::SEQUENCE];
+            uint8_t msgType  = this->buffer[ProtocolMesg::MSG_TYPE];
+            if (devType == ProtocolMesg::BLIP) {
+                printf(": Blip message");
+                    BlipMesg* blip = new BlipMesg(id, devType, sequence, msgType,
+                             std::string(reinterpret_cast<const char*>(&this->buffer[BlipMesg::STRING]),
+                             this->buffer[BlipMesg::SIZE]));
+                    this->messages.push_back(blip);
+
+            } else if (devType == ProtocolMesg::WIDGET) {
+                uint16_t serial = this->buffer[WidgetMesg::SERIAL_1] << 8
+                    | this->buffer[WidgetMesg::SERIAL_2];
+                uint8_t batch   = this->buffer[WidgetMesg::BATCH];
+                uint8_t version = this->buffer[WidgetMesg::VERSION_MAJOR] << 16
+                    | this->buffer[WidgetMesg::VERSION_MINOR] << 8
+                    | this->buffer[WidgetMesg::VERSION_PATCH];
+                printf(": Widget message %04X batch %02X ver %06X",
+                       serial, batch, version);
+                    WidgetMesg* widget = new WidgetMesg(id, devType, sequence, msgType,
+                               serial, batch, version);
+                    this->messages.push_back(widget);
+
+            } else if (devType == ProtocolMesg::LATCH) {
+                bool open = false;
+                if (this->buffer[ProtocolMesg::MSG_TYPE] == LatchMesg::STATUS) {
+                    open = this->buffer[LatchMesg::STATE];
+                } else if (this->buffer[ProtocolMesg::MSG_TYPE] == LatchMesg::OPEN) {
+                    open = true;
+                } else if (this->buffer[ProtocolMesg::MSG_TYPE] == LatchMesg::CLOSE) {
+                    open = false;
+                }
+                printf(": Latch message %s", open ? "open" : "closed");
+                LatchMesg* latch = new LatchMesg(id, devType, sequence, msgType, open);
+                this->messages.push_back(latch);
+
+            } else {
+                // BJN: See other note about device ID.
+                printf("FATAL: Unknown device ID");
             }
-            break;
-         default:
-            // BJN: This protocol doesn't allow for graceful recovery since it's
-            // impossible to find breaks between messages. If there's a message
-            // we can't ID, we can't find the payload size. Without that we can't
-            // find the next message.
-            // (In reality, you'd probably wait for a quiet time on the line and
-            // reset all the buffers. In unit-test land, that sort of heuristic
-            // doesn't make much sense.)
-            printf("FATAL: Unknown device ID\n");
-            return;
-      }
-   }
-
-   if (this->buffer[ProtocolMesg::DEVICE_TYPE] == ProtocolMesg::BLIP
-       && recievedBytes() == BlipMesg::SIZE+1) {
-      // Special case for BLIP message - grab the string size from
-      // the first byte of payload.
-      expectedBytes += this->buffer[BlipMesg::SIZE];
-   }
-
-   if (recievedBytes() == this->expectedBytes) {
-      // Verify checksum and close out
-      uint8_t sum = 0;
-      uint8_t checksum = this->buffer.back();
-      this->buffer.pop_back();
-      printf("INFO: Processing");
-      for (auto it : this->buffer) {
-         printf(" %02x", it);
-         sum += it;
-      }
-
-      if (sum == checksum) {
-          printf("\nINFO:     checksum OK");
-          // Compute common fields
-          uint16_t id      = this->buffer[ProtocolMesg::DEVICE_ID_1] << 8
-                           | this->buffer[ProtocolMesg::DEVICE_ID_2];
-          ProtocolMesg::deviceType_e devType  =
-              static_cast<ProtocolMesg::deviceType_e>(
-                  this->buffer[ProtocolMesg::DEVICE_TYPE]);
-          uint8_t sequence = this->buffer[ProtocolMesg::SEQUENCE];
-          uint8_t msgType  = this->buffer[ProtocolMesg::MSG_TYPE];
-          if (devType == ProtocolMesg::BLIP) {
-              printf(": Blip message");
-              this->messages.emplace_back(
-                  BlipMesg(id, devType, sequence, msgType,
-                           std::string(reinterpret_cast<const char*>(&this->buffer[BlipMesg::STRING]),
-                                       this->buffer[BlipMesg::SIZE])));
-
-          } else if (devType == ProtocolMesg::WIDGET) {
-              uint16_t serial = this->buffer[WidgetMesg::SERIAL_1] << 8
-                              | this->buffer[WidgetMesg::SERIAL_2];
-              uint8_t batch   = this->buffer[WidgetMesg::BATCH];
-              uint8_t version = this->buffer[WidgetMesg::VERSION_MAJOR] << 16
-                              | this->buffer[WidgetMesg::VERSION_MINOR] << 8
-                              | this->buffer[WidgetMesg::VERSION_PATCH];
-              printf(": Widget message %04X batch %02X ver %06X",
-                     serial, batch, version);
-              this->messages.emplace_back(
-                  WidgetMesg(id, devType, sequence, msgType,
-                             serial, batch, version));
-
-          } else if (devType == ProtocolMesg::LATCH) {
-              bool state = false;
-              if (false) {}
-              printf(": Latch message %s", state ? "on" : "off");
-              this->messages.emplace_back(
-                  LatchMesg(id, devType, sequence, msgType, state));
-
-          } else {
-              // BJN: See other note about device ID.
-              printf("FATAL: Unknown device ID");
-          }
-      } else {
-          printf("\nWARNING: checksum BAD: Expected %02x; found %02x!", sum, checksum);
-      }
-      // Now that the message is this->messages, clear the buffer.
-      printf("\n");
-      this->clearBuffer();
-   }
+        } else {
+            printf("\nWARNING: checksum BAD: Expected %02x; found %02x!", sum, checksum);
+        }
+        // Now that the message is this->messages, clear the buffer.
+        printf("\n");
+        this->clearBuffer();
+    }
 }
 
 // Check whether a particular device has an unread message.
 bool StreamDecoder::hasMessage(uint16_t deviceId) {
-   for (auto it : this->messages) {
-       if (it.deviceId == deviceId) {
-           return true;
-       }
-   }
-   return false;
+    for (auto it : this->messages) {
+        if (it->deviceId == deviceId) {
+            return true;
+        }
+    }
+    return false;
 }
 
 // Get the next message (in sequence order) from internal storage.
-ProtocolMesg StreamDecoder::popNextMessage(uint16_t deviceId) {
-   return ProtocolMesg(1, ProtocolMesg::WIDGET, 3, 4);
+ProtocolMesg* StreamDecoder::popNextMessage(uint16_t deviceId) {
+    // Holding on to the iterator (rather than the unwrapped ProtocolMesg*
+    // allows for deletion after iteration). messages.end() is always invalid,
+    // so it's a good initial value.
+    std::list<ProtocolMesg*>::iterator bestMessage = messages.end();
+    for (std::list<ProtocolMesg*>::iterator it=messages.begin();
+         it != messages.end(); it++) {
+        if ((*it)->deviceId == deviceId) {
+            // The double-dereferences are pretty ugly, though.
+            if (this->betterSequenceNumber((*bestMessage)->sequence, (*it)->sequence)) {
+                bestMessage = it;
+            }
+        }
+    }
+    // I'm not certain if the bestMessage iterator is destroyed by
+    // erasing its value from the list. Grab a pointer to the message first.
+    ProtocolMesg* retVal = *bestMessage;
+    if (bestMessage == messages.end()) {
+        printf("ERROR: No message found.\n");
+    } else {
+        this->messages.erase(bestMessage);
+    }
+    return retVal;
+}
+
+
+// Returns true if newSequence is lower than savedSequence, after unwrapping logic.
+bool StreamDecoder::betterSequenceNumber(uint8_t savedSequence, uint8_t newSequence) {
+    // This handles wraparound - in the special case where the best sequence number
+    // is low (1..50) but there exist high numbers (205..255), the high numbers are
+    // older, due to wraparound. (This will fail if more than 50 messages are left
+    // in the queue, or if sequence numbers jump for some reason.)
+    //
+    // BJN: Magic numbers aren't my favorite, but I think this is more readable
+    // without naming the numbers.
+    // (savedSequence < WRAPAROUND_FACTOR && newSequence > 0xFF-WRAPAROUND_FACTOR) {
+
+    if (savedSequence < 50 && newSequence > 205) {
+        return true;
+    }
+
+    // Normal case - just pick the lowest number.
+    return savedSequence > newSequence;
 }

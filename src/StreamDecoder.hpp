@@ -53,7 +53,7 @@ class StreamDecoder {
      // Get the next message (in sequence order) from internal storage.
      // The actual class returned will depend on the deviceId - see
      // ProtocolMesg for details on fields for each message type.
-     ProtocolMesg popNextMessage(uint16_t deviceId);
+     ProtocolMesg* popNextMessage(uint16_t deviceId);
 
    protected:
      // Messages is a list of recieved messages.
@@ -61,7 +61,7 @@ class StreamDecoder {
      // Add a message to the end -> push O(1)
      // Find the most recent message for a device -> iterate O(n)
      // Remove that message -> pop O(1)
-     std::list<ProtocolMesg> messages;
+     std::list<ProtocolMesg*> messages;
 
      // Buffer of bytes that aren't yet processed into a message.
      std::vector<uint8_t> buffer;
@@ -72,6 +72,9 @@ class StreamDecoder {
      uint16_t recievedBytes() {
         return this->buffer.size();
      }
+
+     // Returns true if newSequence is lower than savedSequence, after unwrapping logic.
+     bool betterSequenceNumber(uint8_t savedSequence, uint8_t newSequence);
 };
 
 #endif
