@@ -3,11 +3,16 @@
 #
 # Implicit rules keep the Makefile a little smaller
 
-CXXFLAGS = -Wall -Wextra -O2 -Isrc
-.PHONY: run
+CXXFLAGS = -Wall -Wextra -O2 -Isrc -g
+.PHONY: run clean debug default
+
+default: bin/reader
 
 run: bin/reader
 	./bin/reader
+
+debug: bin/reader
+	gdb bin/reader
 
 clean:
 	rm src/*.o
@@ -22,4 +27,5 @@ src/ProtocolMesg.o:  src/ProtocolMesg.hpp  src/StreamDecoder.hpp
 src/StreamDecoder.o: src/ProtocolMesg.hpp  src/StreamDecoder.hpp
 
 bin/reader: src/main.o src/ProtocolMesg.o src/StreamDecoder.o
-	$(CXX) $^ -o $@
+	$(CXX) $^ -g -o $@
+

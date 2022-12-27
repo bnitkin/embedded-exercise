@@ -11,6 +11,11 @@ class StreamDecoder {
      StreamDecoder() {
         this->reset();
      }
+     ~StreamDecoder() {
+         for (auto it : this->messages) {
+             delete it;
+         }
+     }
 
      // Clears any state in the StreamDecoder. Useful for recovery if
      // extra bytes arrive in the datastream.

@@ -12,8 +12,8 @@ void test_banner(int test_num, const char* description) {
 
 void test_1() {
     // Test 1: Feed in one of each message type.
-    // This first test verifies that the reader's working properly. This confirms
-    // that message size calculations & checksums work; it doesn't verify any fields.
+    // This first test verifies that the reader's working properly. This first part
+    // confirms that message size calculations & checksums work
     //
     // Formats are pulled from section 1 of the assignment.
     //
@@ -24,33 +24,37 @@ void test_1() {
 
     StreamDecoder decoder;
     // Fields are:      ID    ID2   dev   seq   type  payload........ checksum
-    // Widget (device 0x1F)
-    uint8_t data_1[] = {0x12, 0x24, 0x0F, 0x99, 0x01, 0xDE, 0xAD, 0x0F, 0x01, 0x01, 0x04, 0x7f};
+    // Widget (device 0x0F)
+    uint8_t data_1[] = {0x22, 0x01, 0x0F, 0x00, 0x01, 0xDE, 0xAD, 0x0F, 0x01, 0x01, 0x04, 0xd3};
     decoder.onDataFromChip(data_1, sizeof(data_1));
 
     // Fields are:      ID    ID2   dev   seq   type  payload........ checksum
-    // Latch (device 0x1F) type 1
-    uint8_t data_2[] = {0x01, 0x02, 0x1F, 0x00, 0x01, 0x01, 0x24};
+    // Latch (device 0x1F) type 1 (open)
+    uint8_t data_2[] = {0x22, 0x02, 0x1F, 0x00, 0x01, 0x01, 0x45};
     decoder.onDataFromChip(data_2, sizeof(data_2));
+    // Latch (device 0x1F) type 1 (close)
+    // BJN: Boxed myself into a 20 GOTO 10 situation - needed to add one more message.
+    uint8_t data_a[] = {0x22, 0x02, 0x1F, 0x01, 0x01, 0x00, 0x45};
+    decoder.onDataFromChip(data_a, sizeof(data_a));
     // Latch (device 0x1F) type 2
-    uint8_t data_3[] = {0x01, 0x02, 0x1F, 0x00, 0x02, 0x24};
+    uint8_t data_3[] = {0x22, 0x02, 0x1F, 0x02, 0x02, 0x47};
     decoder.onDataFromChip(data_3, sizeof(data_3));
     // Latch (device 0x1F) type 3
-    uint8_t data_4[] = {0x01, 0x02, 0x1F, 0x00, 0x03, 0x25};
+    uint8_t data_4[] = {0x22, 0x02, 0x1F, 0x03, 0x03, 0x49};
     decoder.onDataFromChip(data_4, sizeof(data_4));
 
     // Fields are:      ID    ID2   dev   seq   type  payload........ checksum
     // Blip (device 0x05) empty string
-    uint8_t data_5[] = {0x03, 0x04, 0x05, 0x00, 0x01, 0x00, 0x0d};
+    uint8_t data_5[] = {0x22, 0x03, 0x05, 0x00, 0x01, 0x00, 0x2b};
     decoder.onDataFromChip(data_5, sizeof(data_5));
     // Blip (device 0x05) short string
-    uint8_t data_6[] = {0x01, 0x02, 0x05, 0x00, 0x01, 0x0c, 'h', 'e', 'l', 'l', 'o', ',', ' ', 'w', 'o', 'r', 'l', 'd', 0x9d};
+    uint8_t data_6[] = {0x22, 0x03, 0x05, 0x01, 0x01, 0x0c, 'h', 'e', 'l', 'l', 'o', ',', ' ', 'w', 'o', 'r', 'l', 'd', 0xc0};
     decoder.onDataFromChip(data_6, sizeof(data_6));
     // Blip (device 0x05) short string, null-terminated
-    uint8_t data_7[] = {0x01, 0x02, 0x05, 0x00, 0x01, 0x0d, 'h', 'e', 'l', 'l', 'o', ',', ' ', 'w', 'o', 'r', 'l', 'd', '\0', 0x9e};
+    uint8_t data_7[] = {0x22, 0x03, 0x05, 0x02, 0x01, 0x0d, 'h', 'e', 'l', 'l', 'o', ',', ' ', 'w', 'o', 'r', 'l', 'd', '\0', 0xc2};
     decoder.onDataFromChip(data_7, sizeof(data_7));
     // Blip (device 0x05) longest string
-    uint8_t data_8[] = {0x01, 0x02, 0x05, 0x00, 0x01, 0xff,
+    uint8_t data_8[] = {0x01, 0x03, 0x05, 0x03, 0x01, 0xff,
         0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, // 255, not 256 bytes.
         0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F,
         0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0x2E, 0x2F,
@@ -67,8 +71,96 @@ void test_1() {
         0xD0, 0xD1, 0xD2, 0xD3, 0xD4, 0xD5, 0xD6, 0xD7, 0xD8, 0xD9, 0xDA, 0xDB, 0xDC, 0xDD, 0xDE, 0xDF,
         0xE0, 0xE1, 0xE2, 0xE3, 0xE4, 0xE5, 0xE6, 0xE7, 0xE8, 0xE9, 0xEA, 0xEB, 0xEC, 0xED, 0xEE, 0xEF,
         0xF0, 0xF1, 0xF2, 0xF3, 0xF4, 0xF5, 0xF6, 0xF7, 0xF8, 0xF9, 0xFA, 0xFB, 0xFC, 0xFD, 0xFE, 0xFF,
-        0x88};
+        0x8c};
     decoder.onDataFromChip(data_8, sizeof(data_8));
+
+    // As long as all those messages are stored, we can pull them back out and verify
+    // that fields all make sense.
+    // BJN: I've copied the data from above to help with verification.
+
+    // Widget (device 0x0F)
+    //  {0x22, 0x01, 0x0F, 0x00, 0x01, 0xDE, 0xAD, 0x0F, 0x01, 0x01, 0x04, 0x7f};
+    assert (decoder.hasMessage(0x2201) == true);
+    WidgetMesg* widgetMsg = static_cast<WidgetMesg*>(decoder.popNextMessage(0x2201));
+    assert (widgetMsg->serial == 0xDEAD);
+    assert (widgetMsg->batch == 0x0F);
+    assert (widgetMsg->version == 0x010104);
+
+    assert (widgetMsg->sequence == 0);
+    assert (widgetMsg->deviceId == 0x2201);
+    assert (widgetMsg->deviceType == 0x0F);
+    assert (widgetMsg->messageType == 0x1);
+
+    // Latch (device 0x1F) type 1 (open)
+    //  {0x22, 0x02, 0x1F, 0x00, 0x01, 0x01, 0x24};
+    assert (decoder.hasMessage(0x2202) == true);
+    LatchMesg* latchMsg = static_cast<LatchMesg*>(decoder.popNextMessage(0x2202));
+    assert (latchMsg->state == true);
+
+    assert (latchMsg->sequence == 0);
+    assert (latchMsg->deviceId == 0x2202);
+    assert (latchMsg->deviceType == 0x1F);
+    assert (latchMsg->messageType == 0x1);
+    delete latchMsg;
+    // Latch (device 0x1F) type 1 (close)
+    //  {0x22, 0x02, 0x1F, 0x00, 0x01, 0x00, 0x23};
+    latchMsg = static_cast<LatchMesg*>(decoder.popNextMessage(0x2202));
+    assert (latchMsg->state == false);
+    assert (latchMsg->sequence == 1);
+    delete latchMsg;
+    // Latch (device 0x1F) type 2
+    //  {0x22, 0x02, 0x1F, 0x00, 0x02, 0x24};
+    latchMsg = static_cast<LatchMesg*>(decoder.popNextMessage(0x2202));
+    assert (latchMsg->state == true);
+    assert (latchMsg->sequence == 2);
+    delete latchMsg;
+    // Latch (device 0x1F) type 3
+    //  {0x22, 0x02, 0x1F, 0x00, 0x03, 0x25};
+    latchMsg = static_cast<LatchMesg*>(decoder.popNextMessage(0x2202));
+    assert (latchMsg->state == false);
+    assert (latchMsg->sequence == 3);
+    delete latchMsg;
+
+    // Blip (device 0x05) empty string
+    //  {0x22, 0x03, 0x05, 0x00, 0x01, 0x00, 0x0d};
+    assert (decoder.hasMessage(0x2203) == true);
+    BlipMesg* blipMsg = static_cast<BlipMesg*>(decoder.popNextMessage(0x2203));
+    assert (blipMsg->payload.compare("") == 0);
+
+    assert (blipMsg->sequence == 0);
+    assert (blipMsg->deviceId == 0x2203);
+    assert (blipMsg->deviceType == 0x05);
+    assert (blipMsg->messageType == 0x1);
+    delete blipMsg;
+
+    // Blip (device 0x05) short string
+    //  {0x22, 0x03, 0x05, 0x00, 0x01, 0x0c, 'h', 'e', 'l', 'l', 'o', ',', ' ', 'w', 'o', 'r', 'l', 'd', 0x9d};
+    assert (decoder.hasMessage(0x2203) == true);
+    blipMsg = static_cast<BlipMesg*>(decoder.popNextMessage(0x2203));
+    assert (blipMsg->payload.compare("hello, world") == 0);
+    delete blipMsg;
+
+    // Blip (device 0x05) short string, null-terminated
+    //  {0x22, 0x03, 0x05, 0x00, 0x01, 0x0d, 'h', 'e', 'l', 'l', 'o', ',', ' ', 'w', 'o', 'r', 'l', 'd', '\0', 0x9e};
+    assert (decoder.hasMessage(0x2203) == true);
+    blipMsg = static_cast<BlipMesg*>(decoder.popNextMessage(0x2203));
+    // BJN: Need to jump through some hoops to embed the null for comparison.
+    std::string compare = "hello, world";
+    compare.push_back('\0');
+    assert (blipMsg->payload.compare(compare) == 0);
+    delete blipMsg;
+
+    // Blip (device 0x05) longest string
+    //  {0x01, 0x03, 0x05, 0x00, 0x01, 0xff,
+    assert (decoder.hasMessage(0x0103) == true);
+    blipMsg = static_cast<BlipMesg*>(decoder.popNextMessage(0x0103));
+    // BJN: Generate the comparison string.
+    compare.clear();
+    for (unsigned char i = 1; i!=0; i++) {
+        compare.push_back(i);
+    }
+    assert (blipMsg->payload.compare(compare) == 0);
+    delete blipMsg;
 }
 
 void test_2() {
@@ -93,10 +185,10 @@ void test_2() {
     uint8_t data_2[] = {0x44, 0x24};
     uint8_t data_3[] = {0x0F, 0x99};
     uint8_t data_4[] = {0x01, 0xDE, 0xAD, 0x0F, 0x01, 0x01, 0x04, 0xB1, 0x01, 0x02, 0x1F, 0x00, 0x01, 0x01};
-    uint8_t data_5[] = {0x74};
+    uint8_t data_5[] = {0x24};
     uint8_t data_6[] = {0x01, 0x52, 0x1F};
     uint8_t data_7[] = {0x00, 0x02};
-    uint8_t data_8[] = {0x24, 0x01, 0x52, 0x1F, 0x00, 0x03, 0x75};
+    uint8_t data_8[] = {0x74, 0x01, 0x52, 0x1F, 0x00, 0x03, 0x75};
     decoder.onDataFromChip(data_2, sizeof(data_2));
     decoder.onDataFromChip(data_3, sizeof(data_3));
     decoder.onDataFromChip(data_4, sizeof(data_4));
@@ -109,7 +201,7 @@ void test_2() {
 }
 
 void test_3() {
-    // Test 2: Show that messages with bad checksums are discarded
+    // Test 3: Show that messages with bad checksums are discarded
     // (Per penultimate paragraph in section 2.0)
     test_banner(3, "Bad checksums");
 
@@ -124,9 +216,103 @@ void test_3() {
     assert (decoder.hasMessage(0x0102) == false);
 }
 
+void test_4() {
+    // This test shows that sequence numbers are fetched in order,
+    // even if they weren't recieved in order. It also shows
+    // sequence number overflow behavior.
+    test_banner(4, "Sequence numbers");
+
+    StreamDecoder decoder;
+    ProtocolMesg* message;
+
+    // First set: out of order
+    uint8_t data_1[] = {
+     // ID    ID2   dev   seq   type  checksum
+        0x00, 0x01, 0x1F, 0x01, 0x02, 0x23,
+        0x00, 0x01, 0x1F, 0x04, 0x02, 0x26,
+        0x00, 0x01, 0x1F, 0x03, 0x02, 0x25,
+        0x00, 0x01, 0x1F, 0x02, 0x02, 0x24,
+        0x00, 0x01, 0x1F, 0x05, 0x02, 0x27};
+    decoder.onDataFromChip(data_1, sizeof(data_1));
+    assert (decoder.hasMessage(0x0001) == true);
+
+    uint8_t order_1[] = {1, 2, 3, 4, 5};
+    for (uint8_t i=0; i < sizeof(order_1); i++) {
+        assert (decoder.hasMessage(0x0001) == true);
+        message = decoder.popNextMessage(0x0001);
+        assert (message->sequence == order_1[i]);
+        delete message;
+    }
+    assert (decoder.hasMessage(0x0001) == false);
+
+
+    // Second set: rollover
+    uint8_t data_2[] = {
+     // ID    ID2   dev   seq   type  checksum
+        0x00, 0x01, 0x1F, 0xFD, 0x02, 0x1F,
+        0x00, 0x01, 0x1F, 0xFE, 0x02, 0x20,
+        0x00, 0x01, 0x1F, 0xFF, 0x02, 0x21,
+        0x00, 0x01, 0x1F, 0x01, 0x02, 0x23,
+        0x00, 0x01, 0x1F, 0x02, 0x02, 0x24};
+    decoder.onDataFromChip(data_2, sizeof(data_2));
+    assert (decoder.hasMessage(0x0001) == true);
+
+    uint8_t order_2[] = {0xFD, 0xFE, 0xFF, 0x01, 0x02};
+    for (uint8_t i=0; i < sizeof(order_2); i++) {
+        assert (decoder.hasMessage(0x0001) == true);
+        message = decoder.popNextMessage(0x0001);
+        assert (message->sequence == order_2[i]);
+        delete message;
+    }
+    assert (decoder.hasMessage(0x0001) == false);
+
+    // data_3 and data_4 show that messages flow in order near the HIGH and LOW
+    // un-wrapping points of 200 and 50.
+    uint8_t data_3[] = {
+     // ID    ID2   dev   seq   type  checksum
+        0x00, 0x01, 0x1F, 48, 0x02, 0x52,
+        0x00, 0x01, 0x1F, 49, 0x02, 0x53,
+        0x00, 0x01, 0x1F, 50, 0x02, 0x54,
+        0x00, 0x01, 0x1F, 51, 0x02, 0x55,
+        0x00, 0x01, 0x1F, 52, 0x02, 0x56};
+    decoder.onDataFromChip(data_3, sizeof(data_3));
+    assert (decoder.hasMessage(0x0001) == true);
+
+    uint8_t order_3[] = {48, 49, 50, 51, 52};
+    for (uint8_t i=0; i < sizeof(order_3); i++) {
+        assert (decoder.hasMessage(0x0001) == true);
+        message = decoder.popNextMessage(0x0001);
+        assert (message->sequence == order_3[i]);
+        delete message;
+    }
+    assert (decoder.hasMessage(0x0001) == false);
+
+    uint8_t data_4[] = {
+     // ID    ID2   dev   seq   type  checksum
+        0x00, 0x01, 0x1F, 202, 0x02, 0xec,
+        0x00, 0x01, 0x1F, 201, 0x02, 0xeb,
+        0x00, 0x01, 0x1F, 200, 0x02, 0xea,
+        0x00, 0x01, 0x1F, 199, 0x02, 0xe9,
+        0x00, 0x01, 0x1F, 198, 0x02, 0xe8};
+    decoder.onDataFromChip(data_4, sizeof(data_4));
+    assert (decoder.hasMessage(0x0001) == true);
+
+    uint8_t order_4[] = {198, 199, 200, 201, 202};
+    for (uint8_t i=0; i < sizeof(order_4); i++) {
+        assert (decoder.hasMessage(0x0001) == true);
+        message = decoder.popNextMessage(0x0001);
+        assert (message->sequence == order_4[i]);
+        delete message;
+    }
+    assert (decoder.hasMessage(0x0001) == false);
+
+}
+
 int main() {
     printf("Hello, world!\n");
     test_1();
     test_2();
     test_3();
+    test_4();
+    printf("Goodbye, world! Till next time.\n");
 }

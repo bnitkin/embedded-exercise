@@ -83,17 +83,21 @@ void StreamDecoder::parseByte(uint8_t data) {
             uint8_t sequence = this->buffer[ProtocolMesg::SEQUENCE];
             uint8_t msgType  = this->buffer[ProtocolMesg::MSG_TYPE];
             if (devType == ProtocolMesg::BLIP) {
-                printf(": Blip message");
-                    BlipMesg* blip = new BlipMesg(id, devType, sequence, msgType,
-                             std::string(reinterpret_cast<const char*>(&this->buffer[BlipMesg::STRING]),
-                             this->buffer[BlipMesg::SIZE]));
+                BlipMesg* blip = new BlipMesg(id, devType, sequence, msgType,
+                    std::string(reinterpret_cast<const char*>(&this->buffer[BlipMesg::STRING]),
+                    this->buffer[BlipMesg::SIZE]));
                     this->messages.push_back(blip);
+
+                // BJN: This displays the actual payload, but the string could
+                // have escape characters in it, and that'll mess with a terminal.
+                //printf(": Blip message %s", blip->payload.c_str());
+                printf(": Blip message %ldB", blip->payload.size());
 
             } else if (devType == ProtocolMesg::WIDGET) {
                 uint16_t serial = this->buffer[WidgetMesg::SERIAL_1] << 8
                     | this->buffer[WidgetMesg::SERIAL_2];
                 uint8_t batch   = this->buffer[WidgetMesg::BATCH];
-                uint8_t version = this->buffer[WidgetMesg::VERSION_MAJOR] << 16
+                uint32_t version = this->buffer[WidgetMesg::VERSION_MAJOR] << 16
                     | this->buffer[WidgetMesg::VERSION_MINOR] << 8
                     | this->buffer[WidgetMesg::VERSION_PATCH];
                 printf(": Widget message %04X batch %02X ver %06X",
@@ -148,7 +152,8 @@ ProtocolMesg* StreamDecoder::popNextMessage(uint16_t deviceId) {
          it != messages.end(); it++) {
         if ((*it)->deviceId == deviceId) {
             // The double-dereferences are pretty ugly, though.
-            if (this->betterSequenceNumber((*bestMessage)->sequence, (*it)->sequence)) {
+            if (bestMessage == messages.end() ||
+                this->betterSequenceNumber((*bestMessage)->sequence, (*it)->sequence)) {
                 bestMessage = it;
             }
         }
@@ -157,8 +162,12 @@ ProtocolMesg* StreamDecoder::popNextMessage(uint16_t deviceId) {
     // erasing its value from the list. Grab a pointer to the message first.
     ProtocolMesg* retVal = *bestMessage;
     if (bestMessage == messages.end()) {
+        // If this were in a larger application, there'd be clever ways to handle
+        // errors - logging, a watchdog reset, or something. For PC use I'm using
+        // printf to indicate that something happened, and not trying to handle it.
         printf("ERROR: No message found.\n");
     } else {
+        printf("INFO: Found message for %04x with sequence %02x.\n", deviceId, retVal->sequence);
         this->messages.erase(bestMessage);
     }
     return retVal;
@@ -168,18 +177,27 @@ ProtocolMesg* StreamDecoder::popNextMessage(uint16_t deviceId) {
 // Returns true if newSequence is lower than savedSequence, after unwrapping logic.
 bool StreamDecoder::betterSequenceNumber(uint8_t savedSequence, uint8_t newSequence) {
     // This handles wraparound - in the special case where the best sequence number
-    // is low (1..50) but there exist high numbers (205..255), the high numbers are
+    // is low (1..50) but there exist high numbers (200..255), the high numbers are
     // older, due to wraparound. (This will fail if more than 50 messages are left
     // in the queue, or if sequence numbers jump for some reason.)
     //
     // BJN: Magic numbers aren't my favorite, but I think this is more readable
     // without naming the numbers.
     // (savedSequence < WRAPAROUND_FACTOR && newSequence > 0xFF-WRAPAROUND_FACTOR) {
+    const uint8_t WRAPAROUND_LOW  = 50;
+    const uint8_t WRAPAROUND_HIGH = 200;
 
-    if (savedSequence < 50 && newSequence > 205) {
+    if (savedSequence > WRAPAROUND_HIGH && newSequence < WRAPAROUND_LOW) {
+        // If saved is near wrapping and new is in the low region,
+        // keep the saved one.
+        return false;
+    }
+    if (savedSequence < WRAPAROUND_LOW && newSequence > WRAPAROUND_HIGH) {
+        // If saved is in the low region and we find a number near wraparound,
+        // pick that.
         return true;
     }
 
-    // Normal case - just pick the lowest number.
+    // Otherwise - just pick the lowest number.
     return savedSequence > newSequence;
 }
