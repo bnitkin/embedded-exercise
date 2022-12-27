@@ -13,5 +13,13 @@ clean:
 	rm src/*.o
 	rm bin/reader
 
+# All three of these files rely on both of the headers.
+# (BJN: truth be told, compiling everything directly would be simpler,
+# but this way make can run some dependency trees. If this were a larger project,
+# setting up auto-dependencies would be worthwhile; this is faking that.)
+src/main.o:          src/ProtocolMesg.hpp  src/StreamDecoder.hpp
+src/ProtocolMesg.o:  src/ProtocolMesg.hpp  src/StreamDecoder.hpp
+src/StreamDecoder.o: src/ProtocolMesg.hpp  src/StreamDecoder.hpp
+
 bin/reader: src/main.o src/ProtocolMesg.o src/StreamDecoder.o
 	$(CC) $^ -o $@

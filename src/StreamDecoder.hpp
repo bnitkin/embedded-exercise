@@ -3,10 +3,19 @@
 
 #include <stdint.h>
 #include <list>
+#include <vector>
 #include "ProtocolMesg.hpp"
 
 class StreamDecoder {
   public:
+     StreamDecoder() {
+        this->reset();
+     }
+
+     // Clears any state in the StreamDecoder. Useful for recovery if
+     // extra bytes arrive in the datastream.
+     void reset();
+
      // Parse many bytes of incoming data. Data may be segmented,
      // but messages must arrive in the same order as on the wire.
      // Splitting data in the middle of messages is fine, as is packing
@@ -42,12 +51,23 @@ class StreamDecoder {
      // ProtocolMesg for details on fields for each message type.
      ProtocolMesg popNextMessage(uint16_t deviceId);
 
-   private:
+   protected:
+     // Messages is a list of recieved messages.
      // A list is nice since we never need to access elements by index.
      // Add a message to the end -> push O(1)
      // Find the most recent message for a device -> iterate O(n)
      // Remove that message -> pop O(1)
      std::list<ProtocolMesg> messages;
+
+     // Buffer of bytes that aren't yet processed into a message.
+     std::vector<uint8_t> buffer;
+     uint16_t expectedBytes;
+
+     // Convenience function to get the number of bytes stored for the
+     // message currently being recieved.
+     uint16_t recievedBytes() {
+        return this->buffer.size();
+     }
 };
 
 #endif

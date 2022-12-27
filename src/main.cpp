@@ -4,4 +4,5 @@
 
 int main() {
    printf("Hello, world!\n");
+   //onDataFromChip(uint8_t* data, int size) {
 }
