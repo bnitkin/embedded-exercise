@@ -29,6 +29,8 @@ ProtocolMesg and its child classes are very simple containers for message data.
 ## Test framework
 I didn't want to set up gtest or a real unit test framework for a demonstration,
 so these tests use C's native `assert` keyword and manual setup/teardown.
+A single failed assert will immediately stop the program, so executing to the end
+indicates every assertion passed.
 
 ## Notes
 I've sprinkled some comments starting with `//BJN` throughout. These show
