@@ -48,8 +48,6 @@ class StreamDecoder {
      // Find the most recent message for a device -> iterate O(n)
      // Remove that message -> pop O(1)
      std::list<ProtocolMesg> messages;
-     ProtocolMesgFactory builder;
-
 };
 
 #endif

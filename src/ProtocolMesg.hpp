@@ -1,50 +1,35 @@
 #ifndef PROTOCOLMESG_H
 #define PROTOCOLMESG_H
+
+#include <string>
+
 typedef enum {
    BLIP   = 0x05,
    WIDGET = 0x0F,
    LATCH  = 0x1F,
 } deviceType_e;
 
-class ProtocolMesgFactory {
-
-};
-
 class ProtocolMesg {
    public:
-      ProtocolMessage();
-      deviceType_e getDeviceType() {
-         return BLIP;
-      }
-
-   protected:
-      // Header overhead is ID:2 + Type:1 + Sequence:1 + Type:1 + Checksum:1 = 6B
-      // Max body is 255+1B of string in Blip message.
-      vector<uint8_t> data;
+      const uint16_t deviceId;
+      const deviceType_e deviceType;
+      const uint8_t sequence;
+      const uint8_t messageType;
 };
 
-// The below classes all specialize ProtocolMesg to enable protocol-agnostic getters.
+// The below classes all specialize ProtocolMesg to enable protocol-agnostic fields.
+// They all use const fields - this allows references to the raw messages to be passed
+// around without letting external callers modify the message. The functionality is
+// identical to non-const data that's only accessable through getters, but with less
+// syntatical overhead.
 
-// BJN: All the behavior uses the internally-stored copy of the message and generate
-// protocol-abstracted data on the fly. It could be more performant to preprocess the
-// message into fields and only save the data from the messages. (But that depends
-// on getters being queried many times per message; otherwise it's break-even)
 class BlipMesg: public ProtocolMesg {
    public:
       typedef enum {
          HELLO = 0x01,
       } messageType_e;
 
-      // Return a pointer to the string data.
-      // BJN: const to keep the end user from modifying the underlying message
-      const char* getPayload() {
-         return "Hello, world!";
-      }
-
-      // Returns the string size from the message.
-      uint8_t getSize() {
-         return 5;
-      }
+      const std::string payload = "Hello, world!";
 };
 
 class WidgetMesg: public ProtocolMesg {
@@ -53,23 +38,11 @@ class WidgetMesg: public ProtocolMesg {
          VERSION_INFO = 0x01,
       } messageType_e;
 
-      // Returns the serial number from the message
-      // BJN: I like inlining trivial functions like this by putting them in
-      // the header, and reserving the .cpp file for complex logic.
-      // That's obviously a matter of taste.
-      uint16_t getSerial() {
-         return 0xBEEF;
-      }
-      // Returns the batch number from the message
-      uint8_t getBatch() {
-         return 0xFE;
-      }
-      // Returns the version number, as three packed bytes, from the message
-      // BJN: For human purposes, you could use a snprintf type thing
-      // to format the numbers into a dot-separated string.
-      uint32_t getVersion() {
-         return 0x01 << 16 | 0x05 << 8 | 0x93;
-      }
+      const uint16_t serial = 0xBEEF;
+      const uint8_t batch = 0xFE;
+      // Version is three bytes, but using a uint32 feels better than storing them
+      // as separate elements.
+      const uint32_t version = 0x01 << 16 | 0x05 << 8 | 0x93;
 };
 
 class LatchMesg: public ProtocolMesg {
@@ -81,9 +54,7 @@ class LatchMesg: public ProtocolMesg {
       } messageType_e;
 
       // Returns the message-indicated state of the latch
-      bool getState() {
-         return true;
-      }
+      const bool state = true;
 };
 
 #endif
