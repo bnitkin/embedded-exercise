@@ -21,6 +21,8 @@ void StreamDecoder::clearBuffer() {
 
 // Parse a single byte of incoming data. This performs the work
 // for onDataFromChip().
+// BJN: This is a very long function, and it'd be possible to extract each of
+// the if-blocks to separate functions to shrink this.
 void StreamDecoder::parseByte(uint8_t data) {
     // Add new data to the buffer
     this->buffer.push_back(data);
@@ -51,7 +53,7 @@ void StreamDecoder::parseByte(uint8_t data) {
                 // (In reality, you'd probably wait for a quiet time on the line and
                 // reset all the buffers. In unit-test land, that sort of heuristic
                 // doesn't make much sense.)
-                printf("FATAL: Unknown device ID\n");
+                printf("FATAL: Unknown device type\n");
                 return;
         }
     }
@@ -122,8 +124,8 @@ void StreamDecoder::parseByte(uint8_t data) {
                 this->messages.push_back(latch);
 
             } else {
-                // BJN: See other note about device ID.
-                printf("FATAL: Unknown device ID");
+                // BJN: See other note about device type.
+                printf("FATAL: Unknown device type");
             }
         } else {
             printf("\nWARNING: checksum BAD: Expected %02x; found %02x!", sum, checksum);
@@ -146,8 +148,8 @@ bool StreamDecoder::hasMessage(uint16_t deviceId) {
 
 // Get the next message (in sequence order) from internal storage.
 ProtocolMesg* StreamDecoder::popNextMessage(uint16_t deviceId) {
-    // Holding on to the iterator (rather than the unwrapped ProtocolMesg*
-    // allows for deletion after iteration). messages.end() is always invalid,
+    // Holding on to the iterator (rather than the unwrapped ProtocolMesg*)
+    // allows for deletion after iteration. messages.end() is always invalid,
     // so it's a good initial value.
     std::list<ProtocolMesg*>::iterator bestMessage = messages.end();
     for (std::list<ProtocolMesg*>::iterator it=messages.begin();
@@ -160,7 +162,7 @@ ProtocolMesg* StreamDecoder::popNextMessage(uint16_t deviceId) {
             }
         }
     }
-    // I'm not certain if the bestMessage iterator is destroyed by
+    // BJN: I'm not certain if the bestMessage iterator is destroyed by
     // erasing its value from the list. Grab a pointer to the message first.
     ProtocolMesg* retVal = *bestMessage;
     if (bestMessage == messages.end()) {
@@ -183,20 +185,17 @@ bool StreamDecoder::betterSequenceNumber(uint8_t savedSequence, uint8_t newSeque
     // older, due to wraparound. (This will fail if more than 50 messages are left
     // in the queue, or if sequence numbers jump for some reason.)
     //
-    // BJN: Magic numbers aren't my favorite, but I think this is more readable
-    // without naming the numbers.
-    // (savedSequence < WRAPAROUND_FACTOR && newSequence > 0xFF-WRAPAROUND_FACTOR) {
     const uint8_t WRAPAROUND_LOW  = 50;
     const uint8_t WRAPAROUND_HIGH = 200;
 
     if (savedSequence > WRAPAROUND_HIGH && newSequence < WRAPAROUND_LOW) {
-        // If saved is near wrapping and new is in the low region,
+        // If saved is near wrapping and new wrapped recently,
         // keep the saved one.
         return false;
     }
     if (savedSequence < WRAPAROUND_LOW && newSequence > WRAPAROUND_HIGH) {
-        // If saved is in the low region and we find a number near wraparound,
-        // pick that.
+        // If saved wrapped recently and new hasn't wrapped yet, new is older.
+        // Pick that.
         return true;
     }
 
