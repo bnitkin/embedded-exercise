@@ -9,9 +9,10 @@
 class StreamDecoder {
   public:
      StreamDecoder() {
-        this->reset();
+         this->reset();
      }
      ~StreamDecoder() {
+         // Free anything that was allocated with `new`
          for (auto it : this->messages) {
              delete it;
          }

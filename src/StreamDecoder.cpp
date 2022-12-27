@@ -4,7 +4,9 @@
 // extra bytes arrive in the datastream.
 void StreamDecoder::reset() {
     // Erase both the recieved-message and processing buffers.
-    // TODO: Free all the messages.
+    for (auto it : this->messages) {
+        delete it;
+    }
     this->messages.clear();
     this->clearBuffer();
 }
